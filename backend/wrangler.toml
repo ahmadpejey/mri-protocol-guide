@@ -1,0 +1,8 @@
+name = "mri-api"
+main = "src/index.js"
+compatibility_date = "2024-04-01"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "mri-db"
+database_id = "835eec63-8e6a-45e4-9603-84fee2522ac6"

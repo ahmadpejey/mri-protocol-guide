@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SYSADMIN | uMR580 Protocols</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="css/style.css">
+    <script src="js/api.js"></script>
+    <script src="js/admin.js"></script>
+</head>
+
+<body
+    class="bg-zinc-950 text-zinc-300 font-mono antialiased min-h-screen flex flex-col relative selection:bg-emerald-500/30"
+    x-data="adminApp()" x-init="initAdmin()">
+
+    <div x-show="showModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] transition-opacity"
+        x-cloak>
+        <div class="bg-zinc-900 border border-zinc-800 rounded-[28px] p-8 w-[450px] shadow-2xl">
+            <h2 class="text-emerald-400 font-bold font-sans text-lg tracking-wide mb-6">Create Protocol</h2>
+
+            <div class="space-y-5">
+                <div>
+                    <label
+                        class="block text-xs font-sans font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Protocol
+                        Name</label>
+                    <input type="text" x-model="modalData.name"
+                        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm"
+                        placeholder="e.g., Routine Brain">
+                </div>
+
+                <div>
+                    <label
+                        class="block text-xs font-sans font-semibold text-zinc-400 mb-2 uppercase tracking-wider">Assign
+                        to Group</label>
+                    <select x-model="modalData.groupId"
+                        class="w-full bg-zinc-950 border border-zinc-800 rounded-xl text-zinc-100 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm appearance-none">
+                        <option value="" class="text-zinc-500">-- Select Group --</option>
+                        <template x-for="group in db.groups" :key="group.GroupID">
+                            <option :value="group.GroupID" x-text="group.GroupName"></option>
+                        </template>
+                        <option value="NEW_GROUP" class="text-emerald-400 font-bold">+ Create New Group</option>
+                    </select>
+                </div>
+
+                <div x-show="modalData.groupId === 'NEW_GROUP'" x-collapse>
+                    <label
+                        class="block text-xs font-sans font-semibold text-emerald-500 mb-2 uppercase tracking-wider mt-2">New
+                        Group Name</label>
+                    <input type="text" x-model="modalData.newGroupName"
+                        class="w-full bg-emerald-950/20 border border-emerald-900/50 rounded-xl text-emerald-300 px-4 py-3 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-sm"
+                        placeholder="e.g., Abdomen">
+                </div>
+            </div>
+
+            <div class="mt-8 flex justify-end gap-3 font-sans">
+                <button @click="closeModal()"
+                    class="text-zinc-400 hover:text-zinc-100 px-5 py-2.5 text-sm font-semibold transition-colors rounded-xl hover:bg-zinc-800">Cancel</button>
+                <button @click="confirmAddProtocol()" :disabled="isSaving"
+                    class="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-2.5 text-sm font-bold transition-colors disabled:opacity-50 rounded-xl shadow-lg shadow-emerald-900/20">
+                    <span x-text="isSaving ? 'Saving...' : 'Create'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <div x-show="showManageGroupsModal"
+        class="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] transition-opacity"
+        x-cloak>
+        <div
+            class="bg-zinc-900 border border-zinc-800 rounded-[28px] p-8 w-[500px] max-h-[80vh] flex flex-col shadow-2xl">
+            <h2 class="text-blue-400 font-bold font-sans text-lg tracking-wide mb-6">Manage Groups</h2>
+
+            <div class="overflow-y-auto flex-1 space-y-3 pr-2 custom-scrollbar">
+                <template x-for="group in db.groups" :key="group.GroupID">
+                    <div
+                        class="flex gap-3 items-center bg-zinc-950/50 p-3 rounded-xl border border-zinc-800/50 hover:border-zinc-700 transition-colors">
+                        <div class="w-16">
+                            <label class="text-[10px] font-sans font-bold text-zinc-500 block mb-1">ORDER</label>
+                            <input type="number" x-model="group.GroupOrder"
+                                class="w-full bg-zinc-900 rounded border border-zinc-800 text-blue-300 focus:border-blue-500 outline-none px-2 py-1.5 text-sm text-center">
+                        </div>
+                        <div class="flex-1">
+                            <label class="text-[10px] font-sans font-bold text-zinc-500 block mb-1">GROUP NAME</label>
+                            <input type="text" x-model="group.GroupName"
+                                class="w-full bg-zinc-900 rounded border border-zinc-800 text-zinc-200 focus:border-blue-500 outline-none px-3 py-1.5 text-sm">
+                        </div>
+                    </div>
+                </template>
+            </div>
+
+            <div class="mt-8 flex justify-end gap-3 font-sans border-t border-zinc-800/50 pt-6">
+                <button @click="closeManageGroups()"
+                    class="text-zinc-400 hover:text-zinc-100 px-5 py-2.5 text-sm font-semibold transition-colors rounded-xl hover:bg-zinc-800">Cancel</button>
+                <button @click="saveGroups()" :disabled="isSaving"
+                    class="bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 text-sm font-bold transition-colors disabled:opacity-50 rounded-xl shadow-lg shadow-blue-900/20">
+                    <span x-text="isSaving ? 'Saving...' : 'Save Groups'"></span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <header
+        class="bg-zinc-950 border-b border-zinc-900 py-3 px-6 sticky top-0 z-50 flex justify-between items-center shadow-sm">
+        <div class="flex items-center gap-4">
+            <h1 class="text-lg font-bold font-sans text-zinc-100 tracking-tight">System Admin</h1>
+            <span
+                class="text-[10px] uppercase tracking-widest font-bold bg-zinc-900 text-zinc-400 px-2.5 py-1 rounded-md border border-zinc-800">ROOT@UMR580</span>
+        </div>
+        <div class="flex gap-3 font-sans">
+            <a href="index.html"
+                class="text-zinc-400 hover:text-zinc-100 px-4 py-2 text-sm font-semibold transition-colors rounded-xl hover:bg-zinc-900 flex items-center">Exit</a>
+            <button @click="saveSequences()" :disabled="isSaving"
+                class="bg-emerald-600 hover:bg-emerald-500 text-white px-5 py-2 text-sm font-bold transition-colors disabled:opacity-50 rounded-xl shadow-md shadow-emerald-900/20">
+                <span x-text="isSaving ? 'Saving...' : 'Save Database'"></span>
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-1 p-6 max-w-[1600px] mx-auto w-full overflow-x-hidden">
+
+        <div x-show="isLoading" class="flex flex-col items-center justify-center py-32 font-sans">
+            <div class="relative w-16 h-16 mb-6">
+                <svg class="animate-spin w-full h-full text-blue-500 absolute inset-0"
+                    xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle>
+                    <path class="opacity-75" fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                    </path>
+                </svg>
+                <div class="absolute inset-0 m-auto w-6 h-6 bg-emerald-500 rounded-full animate-pulse"></div>
+            </div>
+            <span class="text-zinc-400 text-[13px] font-semibold tracking-wider uppercase">Connecting to Cloudflare
+                Edge</span>
+        </div>
+
+        <div x-show="!isLoading" x-cloak class="space-y-6">
+
+            <div class="flex flex-wrap gap-3 font-sans">
+                <button @click="openProtocolModal()"
+                    class="flex items-center gap-2 text-sm bg-emerald-700/90 hover:bg-emerald-600 text-white px-5 py-2.5 font-semibold rounded-xl transition-all shadow-md shadow-emerald-900/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    New Protocol
+                </button>
+                <button @click="openManageGroups()"
+                    class="flex items-center gap-2 text-sm bg-blue-700/90 hover:bg-blue-600 text-white px-5 py-2.5 font-semibold rounded-xl transition-all shadow-md shadow-blue-900/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                    </svg>
+                    Manage Groups
+                </button>
+                <button @click="deleteProtocol()" x-show="selectedProtocolId"
+                    class="flex items-center gap-2 text-sm bg-rose-700 hover:bg-rose-600 text-white px-5 py-2.5 font-semibold rounded-xl transition-all shadow-md shadow-rose-900/20 ml-auto">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16">
+                        </path>
+                    </svg>
+                    Delete Protocol
+                </button>
+            </div>
+
+            <div
+                class="flex flex-col md:flex-row gap-5 bg-zinc-900 p-5 rounded-2xl border border-zinc-800/50 shadow-sm">
+                <div class="min-w-[300px]">
+                    <label
+                        class="block text-[11px] font-sans font-bold text-zinc-500 mb-2 uppercase tracking-wider">Select
+                        Protocol to Edit</label>
+                    <select x-model="selectedProtocolId"
+                        class="w-full bg-zinc-950 border border-zinc-800 text-zinc-200 rounded-xl px-4 py-2.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 font-sans text-sm appearance-none cursor-pointer transition-all">
+                        <option value="">-- Choose Protocol --</option>
+                        <template x-for="protocol in db.protocols" :key="protocol.ProtocolID">
+                            <option :value="protocol.ProtocolID" x-text="protocol.ProtocolName"></option>
+                        </template>
+                    </select>
+                </div>
+
+                <div x-show="selectedProtocolId"
+                    class="flex flex-col sm:flex-row items-end gap-4 p-4 bg-zinc-950/50 border border-zinc-800/50 rounded-xl flex-1">
+                    <div class="flex-1 w-full">
+                        <label
+                            class="block text-[10px] font-sans font-bold text-blue-500/80 mb-1.5 uppercase tracking-wider">Rename
+                            Protocol</label>
+                        <input type="text" x-model="activeProtocolDetails.Name"
+                            class="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-zinc-200 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 text-sm font-sans transition-all">
+                    </div>
+                    <div class="flex-1 w-full">
+                        <label
+                            class="block text-[10px] font-sans font-bold text-blue-500/80 mb-1.5 uppercase tracking-wider">Reassign
+                            Group</label>
+                        <select x-model="activeProtocolDetails.GroupID"
+                            class="w-full bg-zinc-900 border border-zinc-800 rounded-lg text-blue-300 px-3 py-2 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500/50 text-sm font-sans transition-all appearance-none cursor-pointer">
+                            <template x-for="group in db.groups" :key="group.GroupID">
+                                <option :value="group.GroupID" x-text="group.GroupName"></option>
+                            </template>
+                        </select>
+                    </div>
+                    <button @click="updateProtocolDetails()" :disabled="isSaving"
+                        class="text-xs font-sans bg-blue-600 hover:bg-blue-500 text-white px-6 py-2.5 rounded-lg font-bold transition-all whitespace-nowrap shadow-md shadow-blue-900/20">
+                        Update Protocol
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-3 font-sans" x-show="selectedProtocolId">
+                <button @click="addNewSequence()"
+                    class="flex items-center gap-1.5 bg-emerald-700/90 hover:bg-emerald-600 text-white px-4 py-2 text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-900/10">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                    </svg>
+                    Add Sequence
+                </button>
+                <button @click="deleteSelected()"
+                    class="flex items-center gap-1.5 bg-rose-700 hover:bg-rose-600 text-white px-4 py-2 text-sm font-semibold rounded-xl transition-all shadow-md shadow-rose-900/20">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 12H4"></path>
+                    </svg>
+                    Delete Selected
+                </button>
+            </div>
+
+            <div x-show="selectedProtocolId"
+                class="overflow-x-auto bg-zinc-900 rounded-2xl border border-zinc-800/50 shadow-sm pb-2">
+                <table class="w-full text-left text-[13px] whitespace-nowrap">
+                    <thead class="bg-zinc-950/50 border-b border-zinc-800/80">
+                        <tr>
+                            <th class="px-3 py-3 w-10 text-center"><input type="checkbox" @change="toggleAll($event)"
+                                    class="accent-blue-600 w-4 h-4 rounded bg-zinc-900 border-zinc-700"></th>
+                            <th
+                                class="px-2 py-3 w-16 text-center font-sans font-bold text-zinc-500 text-[11px] tracking-wider">
+                                ARRANGE</th>
+                            <th class="px-2 py-3 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">NAME</th>
+                            <th class="px-2 py-3 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">TR</th>
+                            <th class="px-2 py-3 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">TE</th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">
+                                THICK</th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">FLIP
+                            </th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">
+                                PHASE</th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">
+                                MATRX</th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">FOV
+                            </th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">GAP
+                            </th>
+                            <th class="px-2 py-3 w-16 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">AVG
+                            </th>
+                            <th class="px-2 py-3 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">IMAGE URL
+                            </th>
+                            <th class="px-2 py-3 font-sans font-bold text-zinc-500 text-[11px] tracking-wider">NOTES
+                            </th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-zinc-800/40">
+                        <template x-for="(seq, index) in activeSequences" :key="seq.SeqID || index">
+                            <tr class="hover:bg-zinc-800/40 transition-colors focus-within:bg-zinc-800/60 group">
+                                <td class="px-3 py-2 text-center"><input type="checkbox" x-model="selectedRows"
+                                        :value="seq.SeqID"
+                                        class="accent-blue-600 w-4 h-4 rounded bg-zinc-900 border-zinc-700"></td>
+                                <td
+                                    class="px-2 py-2 flex justify-center gap-1.5 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <button @click="moveSeqUp(index)"
+                                        class="text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 p-1 rounded-md transition-colors disabled:opacity-20"
+                                        :disabled="index === 0"><svg class="w-4 h-4" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M5 15l7-7 7 7"></path>
+                                        </svg></button>
+                                    <button @click="moveSeqDown(index)"
+                                        class="text-zinc-500 hover:text-blue-400 hover:bg-zinc-800 p-1 rounded-md transition-colors disabled:opacity-20"
+                                        :disabled="index === activeSequences.length - 1"><svg class="w-4 h-4"
+                                            fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M19 9l-7 7-7-7" transform="rotate(180 12 12)"></path>
+                                        </svg></button>
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Name"
+                                        class="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-200 px-1 py-1 transition-colors font-semibold">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.TR_Range"
+                                        class="w-16 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-blue-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.TE_Range"
+                                        class="w-16 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-blue-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Thickness"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Flip"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Phase"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Matrix"
+                                        class="w-16 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.FOV"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Gap"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Average"
+                                        class="w-12 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-300 px-1 py-1 transition-colors">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.PlanImageURL" placeholder="https://..."
+                                        class="w-24 bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-500 px-1 py-1 transition-colors focus:text-zinc-300">
+                                </td>
+                                <td class="p-1"><input type="text" x-model="seq.Notes"
+                                        placeholder="Radiographer notes..."
+                                        class="w-full bg-transparent border-b border-transparent focus:border-blue-500 outline-none text-zinc-400 px-1 py-1 transition-colors font-sans text-[12px]">
+                                </td>
+                            </tr>
+                        </template>
+                    </tbody>
+                </table>
+                <div x-show="activeSequences.length === 0" class="p-10 text-center">
+                    <svg class="w-10 h-10 mx-auto text-zinc-700 mb-3" fill="none" stroke="currentColor"
+                        viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5"
+                            d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10">
+                        </path>
+                    </svg>
+                    <p class="text-zinc-500 font-sans text-sm font-semibold tracking-wide">No sequences configured.
+                        Click Add Sequence to begin.</p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+</body>
+
+</html>
